@@ -1,4 +1,4 @@
-export type RowStatus = "siap" | "shift-we" | "libur";
+export type RowStatus = "siap" | "shift-we";
 
 export interface PhotoUpload {
   fileName: string;
@@ -11,7 +11,6 @@ export interface ScheduleRow {
   date: Date;
   dayName: string;
   isWeekendShift: boolean;
-  isOtherHoliday: boolean;
   status: RowStatus;
   photoMasuk: PhotoUpload | null;
   photoPulang: PhotoUpload | null;

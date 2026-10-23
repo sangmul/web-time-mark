@@ -20,10 +20,11 @@ export function generateSchedule(config: ScheduleConfig): ScheduleRow[] {
   while (cursor <= to) {
     const weekday = cursor.getDay();
 
-    if (weekday !== config.holidayWeekday) {
-      const isOtherHoliday = otherHolidays.some((holiday) =>
-        isSameCalendarDate(holiday, cursor),
-      );
+    const isOtherHoliday = otherHolidays.some((holiday) =>
+      isSameCalendarDate(holiday, cursor),
+    );
+
+    if (weekday !== config.holidayWeekday && !isOtherHoliday) {
       const isWeekendShift =
         WEEKEND_DAYS.includes(weekday) && weekday !== config.holidayWeekday;
 
@@ -33,8 +34,7 @@ export function generateSchedule(config: ScheduleConfig): ScheduleRow[] {
         date: cursor,
         dayName: dayName(cursor),
         isWeekendShift,
-        isOtherHoliday,
-        status: isOtherHoliday ? "libur" : isWeekendShift ? "shift-we" : "siap",
+        status: isWeekendShift ? "shift-we" : "siap",
         photoMasuk: null,
         photoPulang: null,
         resultMasuk: null,
