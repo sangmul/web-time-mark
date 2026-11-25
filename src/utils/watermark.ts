@@ -209,6 +209,8 @@ export async function generateTimeMarkPhoto({
   const ctx = canvas.getContext("2d");
   if (!ctx) return sourceUrl;
 
+  ctx.fillStyle = "#ffffff"; // transparent PNG/WebP would turn black in JPEG
+  ctx.fillRect(0, 0, width, height);
   ctx.drawImage(image, 0, 0, width, height);
 
   const bearing = bearingFromCoordinate(lat, lng);

@@ -69,3 +69,30 @@ export function formatMinutesToTime12h(totalMinutes: number): string {
   const hours12 = hours24 % 12 === 0 ? 12 : hours24 % 12;
   return `${String(hours12).padStart(2, "0")}:${String(minutes).padStart(2, "0")} ${meridiem}`;
 }
+
+// dd-mm-yyyy <-> yyyy-mm-dd (value format of <input type="date">)
+export function toInputDate(value: string): string {
+  const d = parseDDMMYYYY(value);
+  if (!d) return "";
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+export function fromInputDate(value: string): string {
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return match ? `${match[3]}-${match[2]}-${match[1]}` : "";
+}
+
+// One month before `date`, plus one day (25 Nov -> 26 Oct).
+export function oneMonthBeforePlusOne(date: Date): Date {
+  const y = date.getFullYear();
+  const m = date.getMonth() - 1;
+  const lastDay = new Date(y, m + 1, 0).getDate();
+  return addDays(new Date(y, m, Math.min(date.getDate(), lastDay)), 1);
+}
+
+export function parseDateList(value: string): Date[] {
+  return value
+    .split(",")
+    .map((item) => parseDDMMYYYY(item.trim()))
+    .filter((item): item is Date => item !== null);
+}

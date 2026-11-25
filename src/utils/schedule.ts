@@ -1,5 +1,11 @@
 import type { ScheduleConfig, ScheduleRow } from "../types";
-import { addDays, dayName, isSameCalendarDate, parseDDMMYYYY } from "./date";
+import {
+  addDays,
+  dayName,
+  isSameCalendarDate,
+  parseDDMMYYYY,
+  parseDateList,
+} from "./date";
 
 const WEEKEND_DAYS = [0, 6]; // Sunday, Saturday
 
@@ -8,10 +14,11 @@ export function generateSchedule(config: ScheduleConfig): ScheduleRow[] {
   const to = parseDDMMYYYY(config.toDate);
   if (!from || !to || from > to) return [];
 
-  const otherHolidays = config.otherHolidayDates
-    .split(",")
-    .map((value) => parseDDMMYYYY(value.trim()))
-    .filter((value): value is Date => value !== null);
+  // WFH dates get no photo row (they appear as WFH rows in the PDF).
+  const skipped = [
+    ...parseDateList(config.otherHolidayDates),
+    ...parseDateList(config.wfhDates),
+  ];
 
   const rows: ScheduleRow[] = [];
   let cursor = from;
@@ -20,7 +27,7 @@ export function generateSchedule(config: ScheduleConfig): ScheduleRow[] {
   while (cursor <= to) {
     const weekday = cursor.getDay();
 
-    const isOtherHoliday = otherHolidays.some((holiday) =>
+    const isOtherHoliday = skipped.some((holiday) =>
       isSameCalendarDate(holiday, cursor),
     );
 
@@ -39,6 +46,8 @@ export function generateSchedule(config: ScheduleConfig): ScheduleRow[] {
         photoPulang: null,
         resultMasuk: null,
         resultPulang: null,
+        resultMasukAt: null,
+        resultPulangAt: null,
         resultPhotoMasuk: null,
         resultPhotoPulang: null,
       });

@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from "react";
+import { IMAGE_ACCEPT } from "../utils/image";
 import {
   Camera,
   CheckCircle2,
@@ -56,7 +57,7 @@ function UploadButton({
       <input
         ref={inputRef}
         type="file"
-        accept="image/*"
+        accept={IMAGE_ACCEPT}
         className="hidden"
         onChange={(event) => {
           const file = event.target.files?.[0];
@@ -139,7 +140,7 @@ export default function ScheduleTable({
           <input
             ref={bulkInputRef}
             type="file"
-            accept="image/*"
+            accept={IMAGE_ACCEPT}
             multiple
             className="hidden"
             onChange={(event) => {
