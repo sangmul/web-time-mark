@@ -16,6 +16,8 @@ export interface ScheduleRow {
   photoPulang: PhotoUpload | null;
   resultMasuk: string | null;
   resultPulang: string | null;
+  resultMasukAt: Date | null;
+  resultPulangAt: Date | null;
   resultPhotoMasuk: string | null;
   resultPhotoPulang: string | null;
 }

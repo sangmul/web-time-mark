@@ -39,6 +39,8 @@ export function generateSchedule(config: ScheduleConfig): ScheduleRow[] {
         photoPulang: null,
         resultMasuk: null,
         resultPulang: null,
+        resultMasukAt: null,
+        resultPulangAt: null,
         resultPhotoMasuk: null,
         resultPhotoPulang: null,
       });

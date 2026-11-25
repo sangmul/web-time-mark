@@ -15,9 +15,13 @@ import {
   formatTableDate,
   parseTime12h,
 } from "./utils/date";
+
+const MIN_WORK_SECONDS = 9 * 3600;
 import { jitterCoordinate, parseCoordinate } from "./utils/coordinate";
 import { createEventWorkbook } from "./utils/excel";
 import { generateTimeMarkPhoto } from "./utils/watermark";
+import { normalizeImageFile } from "./utils/image";
+import { createAttendancePdf } from "./utils/pdf";
 
 const ADDRESS_LINES = ["Bambu Apus", "Kecamatan Cipayung", "Kota Jakarta Timur"];
 
@@ -104,7 +108,14 @@ function App() {
   }, [config.coordinate, showToast]);
 
   const handleUploadPhoto = useCallback(
-    (rowId: string, type: "masuk" | "pulang", file: File) => {
+    async (rowId: string, type: "masuk" | "pulang", rawFile: File) => {
+      let file: File;
+      try {
+        file = await normalizeImageFile(rawFile);
+      } catch {
+        showToast(`Format foto tidak didukung: ${rawFile.name}`);
+        return;
+      }
       const url = URL.createObjectURL(file);
       setRows((prev) =>
         prev.map((row) =>
@@ -120,12 +131,22 @@ function App() {
         ),
       );
     },
-    [],
+    [showToast],
   );
 
   const handleBulkUpload = useCallback(
-    (files: FileList) => {
-      const fileArray = Array.from(files);
+    async (files: FileList) => {
+      const settled = await Promise.allSettled(
+        Array.from(files).map((file) => normalizeImageFile(file)),
+      );
+      const fileArray = settled
+        .filter((r): r is PromiseFulfilledResult<File> => r.status === "fulfilled")
+        .map((r) => r.value);
+      const failed = settled.length - fileArray.length;
+      if (fileArray.length === 0) {
+        showToast("Tidak ada foto yang bisa dibaca, format tidak didukung");
+        return;
+      }
       setRows((prev) => {
         const next = [...prev];
         let fileIndex = 0;
@@ -159,7 +180,11 @@ function App() {
         }
         return next;
       });
-      showToast(`${files.length} foto berhasil diunggah secara bulk`);
+      showToast(
+        failed > 0
+          ? `${fileArray.length} foto diunggah, ${failed} dilewati (format tidak didukung)`
+          : `${fileArray.length} foto berhasil diunggah secara bulk`,
+      );
     },
     [showToast],
   );
@@ -222,22 +247,36 @@ function App() {
         rows.map(async (row) => {
           let resultMasuk = row.resultMasuk;
           let resultPulang = row.resultPulang;
+          let resultMasukAt = row.resultMasukAt;
+          let resultPulangAt = row.resultPulangAt;
           let resultPhotoMasuk = row.resultPhotoMasuk;
           let resultPhotoPulang = row.resultPhotoPulang;
 
+          // Pick times (in seconds) so masuk -> pulang is always >= 9 hours.
+          const masukSec =
+            (baseMasuk + Math.round((Math.random() * 2 - 1) * config.selisihMasuk)) *
+              60 +
+            Math.floor(Math.random() * 60);
+          const pulangLo =
+            (basePulang - config.selisihPulang) * 60;
+          const pulangHi = (basePulang + config.selisihPulang) * 60 + 59;
+          const pulangFloor = Math.max(pulangLo, masukSec + MIN_WORK_SECONDS);
+          const pulangSec =
+            pulangFloor >= pulangHi
+              ? pulangFloor
+              : pulangFloor +
+                Math.floor(Math.random() * (pulangHi - pulangFloor + 1));
+
+          const toDate = (seconds: number) => {
+            const d = new Date(row.date);
+            d.setHours(0, 0, seconds, 0);
+            return d;
+          };
+
           if (row.photoMasuk) {
-            const offset = Math.round(
-              (Math.random() * 2 - 1) * config.selisihMasuk,
-            );
-            const minutes = baseMasuk + offset;
-            resultMasuk = formatMinutesToTime12h(minutes);
-            const timestamp = new Date(row.date);
-            timestamp.setHours(
-              0,
-              minutes,
-              Math.floor(Math.random() * 59),
-              0,
-            );
+            const timestamp = toDate(masukSec);
+            resultMasukAt = timestamp;
+            resultMasuk = formatMinutesToTime12h(Math.floor(masukSec / 60));
             const index = indexCounterRef.current;
             indexCounterRef.current += 1;
             const jittered = jitterCoordinate(coordinate.lat, coordinate.lng);
@@ -253,18 +292,9 @@ function App() {
           }
 
           if (row.photoPulang) {
-            const offset = Math.round(
-              (Math.random() * 2 - 1) * config.selisihPulang,
-            );
-            const minutes = basePulang + offset;
-            resultPulang = formatMinutesToTime12h(minutes);
-            const timestamp = new Date(row.date);
-            timestamp.setHours(
-              0,
-              minutes,
-              Math.floor(Math.random() * 59),
-              0,
-            );
+            const timestamp = toDate(pulangSec);
+            resultPulangAt = timestamp;
+            resultPulang = formatMinutesToTime12h(Math.floor(pulangSec / 60));
             const index = indexCounterRef.current;
             indexCounterRef.current += 1;
             const jittered = jitterCoordinate(coordinate.lat, coordinate.lng);
@@ -283,6 +313,8 @@ function App() {
             id: row.id,
             resultMasuk,
             resultPulang,
+            resultMasukAt,
+            resultPulangAt,
             resultPhotoMasuk,
             resultPhotoPulang,
           };
@@ -408,6 +440,9 @@ function App() {
         }
       }
 
+      const pdf = await createAttendancePdf(rows);
+      if (pdf) photosFolder?.file(pdf.fileName, pdf.blob);
+
       const zipBlob = await zip.generateAsync({ type: "blob" });
       const url = URL.createObjectURL(zipBlob);
       const anchor = document.createElement("a");
@@ -418,7 +453,7 @@ function App() {
 
       showToast(
         photoCount > 0
-          ? `ZIP berhasil diunduh (CSV + Excel + ${photoCount} foto time mark)`
+          ? `ZIP berhasil diunduh (CSV + Excel + ${photoCount} foto time mark + PDF)`
           : "ZIP berhasil diunduh (CSV + Excel, belum ada foto time mark)",
       );
     } catch {
