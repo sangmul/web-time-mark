@@ -11,12 +11,18 @@ import Toast from "./components/Toast";
 import type { PhotoUpload, ScheduleConfig, ScheduleRow } from "./types";
 import { generateSchedule } from "./utils/schedule";
 import {
+  formatDDMMYYYY,
   formatMinutesToTime12h,
   formatTableDate,
+  oneMonthBeforePlusOne,
+  parseDDMMYYYY,
+  parseDateList,
   parseTime12h,
 } from "./utils/date";
 
-const MIN_WORK_SECONDS = 9 * 3600;
+// 9 hours plus a safety margin so even the "Local" stamp on the photo
+// (up to ~13s earlier than Network) and minute-rounded displays stay >= 9h.
+const MIN_WORK_SECONDS = 9 * 3600 + 20;
 import { jitterCoordinate, parseCoordinate } from "./utils/coordinate";
 import { createEventWorkbook } from "./utils/excel";
 import { generateTimeMarkPhoto } from "./utils/watermark";
@@ -25,20 +31,24 @@ import { createAttendancePdf } from "./utils/pdf";
 
 const ADDRESS_LINES = ["Bambu Apus", "Kecamatan Cipayung", "Kota Jakarta Timur"];
 
-const DEFAULT_CONFIG: ScheduleConfig = {
-  fromDate: "26-09-2026",
-  toDate: "25-10-2026",
-  holidayWeekday: 0,
-  otherHolidayDates: "25-10-2026, 20-10-2026",
-  jamMasuk: "09:00 AM",
-  selisihMasuk: 10,
-  autoJamPulang: "06:00 PM",
-  selisihPulang: 10,
-  coordinate: "-6.308327, 106.896310 (Daerah Khusus Ibukota Jakarta)",
-};
+function makeDefaultConfig(): ScheduleConfig {
+  const today = new Date();
+  return {
+    fromDate: formatDDMMYYYY(oneMonthBeforePlusOne(today)),
+    toDate: formatDDMMYYYY(today),
+    holidayWeekday: 0,
+    otherHolidayDates: "",
+    wfhDates: "",
+    jamMasuk: "09:00 AM",
+    selisihMasuk: 10,
+    autoJamPulang: "06:00 PM",
+    selisihPulang: 10,
+    coordinate: "-6.308327, 106.896310 (Daerah Khusus Ibukota Jakarta)",
+  };
+}
 
 function App() {
-  const [config, setConfig] = useState<ScheduleConfig>(DEFAULT_CONFIG);
+  const [config, setConfig] = useState<ScheduleConfig>(makeDefaultConfig);
   const [rows, setRows] = useState<ScheduleRow[]>([]);
   const [isGenerated, setIsGenerated] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -76,7 +86,7 @@ function App() {
   );
 
   const handleReset = useCallback(() => {
-    setConfig(DEFAULT_CONFIG);
+    setConfig(makeDefaultConfig());
     setRows([]);
     setIsGenerated(false);
     indexCounterRef.current = 1;
@@ -440,7 +450,12 @@ function App() {
         }
       }
 
-      const pdf = await createAttendancePdf(rows);
+      const pdf = await createAttendancePdf(
+        rows,
+        parseDateList(config.wfhDates),
+        parseDDMMYYYY(config.fromDate) ?? rows[0].date,
+        parseDDMMYYYY(config.toDate) ?? rows[rows.length - 1].date,
+      );
       if (pdf) photosFolder?.file(pdf.fileName, pdf.blob);
 
       const zipBlob = await zip.generateAsync({ type: "blob" });
@@ -464,6 +479,7 @@ function App() {
   }, [
     config.fromDate,
     config.toDate,
+    config.wfhDates,
     isDownloading,
     isGenerated,
     rows,

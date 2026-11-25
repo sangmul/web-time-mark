@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import {
   Calendar,
   Clock,
@@ -7,10 +7,14 @@ import {
   RotateCcw,
   Sparkles,
   SlidersHorizontal,
+  Home,
+  Plus,
   Tag,
+  X,
   Zap,
 } from "lucide-react";
 import type { ScheduleConfig } from "../types";
+import { fromInputDate, parseDDMMYYYY, toInputDate } from "../utils/date";
 
 interface ConfigPanelProps {
   config: ScheduleConfig;
@@ -61,6 +65,100 @@ function InputShell({
 const baseInputClass =
   "w-full border-none bg-transparent p-0 text-sm text-gray-700 outline-none placeholder:text-gray-400";
 
+
+function DateField({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <input
+      type="date"
+      className={`${baseInputClass} cursor-pointer`}
+      value={toInputDate(value)}
+      onChange={(event) => {
+        const next = fromInputDate(event.target.value);
+        if (next) onChange(next);
+      }}
+    />
+  );
+}
+
+// Several dates picked one by one; stored as "dd-mm-yyyy, dd-mm-yyyy".
+function MultiDateField({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const [draft, setDraft] = useState("");
+  const dates = value
+    .split(",")
+    .map((item) => item.trim())
+    .filter((item) => parseDDMMYYYY(item) !== null);
+
+  const commit = (next: string[]) => onChange(next.join(", "));
+  const add = () => {
+    const formatted = fromInputDate(draft);
+    if (!formatted) return;
+    if (!dates.includes(formatted)) {
+      commit(
+        [...dates, formatted].sort(
+          (a, b) =>
+            (parseDDMMYYYY(a)?.getTime() ?? 0) -
+            (parseDDMMYYYY(b)?.getTime() ?? 0),
+        ),
+      );
+    }
+    setDraft("");
+  };
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center gap-2">
+        <input
+          type="date"
+          className={`${baseInputClass} cursor-pointer`}
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+        />
+        <button
+          type="button"
+          onClick={add}
+          disabled={!draft}
+          aria-label="Tambah tanggal"
+          className="flex shrink-0 items-center gap-1 rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs font-medium text-gray-600 transition hover:bg-gray-100 disabled:opacity-40"
+        >
+          <Plus size={13} />
+          Tambah
+        </button>
+      </div>
+      {dates.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {dates.map((date) => (
+            <span
+              key={date}
+              className="flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700"
+            >
+              {date}
+              <button
+                type="button"
+                aria-label={`Hapus ${date}`}
+                onClick={() => commit(dates.filter((d) => d !== date))}
+              >
+                <X size={12} />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ConfigPanel({
   config,
   onChange,
@@ -98,24 +196,18 @@ export default function ConfigPanel({
       <div className="grid grid-cols-1 gap-5 px-6 py-6 sm:grid-cols-2 lg:grid-cols-4">
         <Field label="From (Periode Dari)" required>
           <InputShell icon={<Calendar size={16} />}>
-            <input
-              type="text"
-              className={baseInputClass}
+            <DateField
               value={config.fromDate}
-              placeholder="dd-mm-yyyy"
-              onChange={(event) => onChange("fromDate", event.target.value)}
+              onChange={(value) => onChange("fromDate", value)}
             />
           </InputShell>
         </Field>
 
         <Field label="To (Periode Hingga)" required>
           <InputShell icon={<Calendar size={16} />}>
-            <input
-              type="text"
-              className={baseInputClass}
+            <DateField
               value={config.toDate}
-              placeholder="dd-mm-yyyy"
-              onChange={(event) => onChange("toDate", event.target.value)}
+              onChange={(value) => onChange("toDate", value)}
             />
           </InputShell>
         </Field>
@@ -138,14 +230,18 @@ export default function ConfigPanel({
 
         <Field label="Other Holiday Date">
           <InputShell icon={<Tag size={16} />}>
-            <input
-              type="text"
-              className={baseInputClass}
+            <MultiDateField
               value={config.otherHolidayDates}
-              placeholder="dd-mm-yyyy, dd-mm-yyyy"
-              onChange={(event) =>
-                onChange("otherHolidayDates", event.target.value)
-              }
+              onChange={(value) => onChange("otherHolidayDates", value)}
+            />
+          </InputShell>
+        </Field>
+
+        <Field label="WFH Date">
+          <InputShell icon={<Home size={16} />}>
+            <MultiDateField
+              value={config.wfhDates}
+              onChange={(value) => onChange("wfhDates", value)}
             />
           </InputShell>
         </Field>

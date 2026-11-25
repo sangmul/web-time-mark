@@ -27,6 +27,7 @@ export interface ScheduleConfig {
   toDate: string; // dd-mm-yyyy
   holidayWeekday: number; // 0=Sunday ... 6=Saturday
   otherHolidayDates: string; // comma separated dd-mm-yyyy
+  wfhDates: string; // comma separated dd-mm-yyyy
   jamMasuk: string;
   selisihMasuk: number;
   autoJamPulang: string;
